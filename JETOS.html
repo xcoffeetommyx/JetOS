@@ -1,0 +1,2659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KidOS</title>
+<style>
+  /* ===== RESET & BASE ===== */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    overflow: hidden;
+    user-select: none;
+    width: 100vw;
+    height: 100vh;
+  }
+
+  /* ===== DESKTOP ===== */
+  #desktop {
+    position: fixed;
+    inset: 0;
+    bottom: 52px;
+    background: var(--wallpaper, linear-gradient(135deg, #1a8fe3 0%, #6ec6f5 40%, #b8e4ff 70%, #a0d8ef 100%));
+    overflow: hidden;
+  }
+  #desktop::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: 
+      radial-gradient(ellipse at 20% 80%, rgba(255,255,255,0.15) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 20%, rgba(255,255,255,0.1) 0%, transparent 50%);
+    pointer-events: none;
+  }
+
+  /* ===== DESKTOP ICONS ===== */
+  .desktop-icon {
+    position: absolute;
+    width: 80px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 4px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.15s;
+    text-align: center;
+  }
+  .desktop-icon:hover { background: rgba(255,255,255,0.25); }
+  .desktop-icon.controller-hover { background: rgba(255,255,255,0.25); }
+  .desktop-icon.selected { background: rgba(255,255,255,0.35); outline: 2px solid rgba(255,255,255,0.7); }
+  .desktop-icon.renaming { cursor: text; }
+  .desktop-icon.controller-focused {
+    background: rgba(255,255,255,0.25);
+    outline: 2px solid rgba(255,255,255,0.9);
+    outline-offset: 2px;
+  }
+  .controller-focused {
+    outline: 2px solid rgba(255,255,255,0.9);
+    outline-offset: 2px;
+  }
+  .taskbar-item.controller-focused,
+  .start-app-item.controller-focused {
+    outline-color: rgba(0,188,255,0.9);
+  }
+  .desktop-icon .icon-img {
+    font-size: 40px;
+    line-height: 1;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25));
+  }
+  .desktop-icon .icon-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+    word-break: break-word;
+    line-height: 1.2;
+  }
+  .icon-rename-input {
+    width: 72px;
+    padding: 2px 4px;
+    border: 1px solid rgba(255,255,255,0.8);
+    border-radius: 4px;
+    background: rgba(255,255,255,0.94);
+    color: #111;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    text-align: center;
+  }
+  #selection-box {
+    position: fixed;
+    display: none;
+    border: 1px solid rgba(0,120,215,0.9);
+    background: rgba(0,120,215,0.18);
+    pointer-events: none;
+    z-index: 8500;
+  }
+
+  /* ===== TASKBAR ===== */
+  #taskbar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 52px;
+    background: rgba(0,0,0,0.75);
+    backdrop-filter: blur(20px);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 8px;
+    z-index: 9000;
+    border-top: 1px solid rgba(255,255,255,0.1);
+  }
+  #taskbar.style-centered { justify-content: center; }
+  #taskbar.style-left { justify-content: flex-start; }
+
+  #start-btn {
+    width: 44px;
+    height: 44px;
+    border: none;
+    background: linear-gradient(135deg, #0078d7, #00bcff);
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.1s, filter 0.1s;
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(0,120,215,0.5);
+  }
+  #start-btn:hover { filter: brightness(1.15); transform: scale(1.05); }
+  #start-btn:active { transform: scale(0.95); }
+
+  #taskbar-apps {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+  }
+  #taskbar.style-centered #taskbar-apps { justify-content: center; }
+  #taskbar.style-left #taskbar-apps { justify-content: flex-start; }
+
+  .taskbar-item {
+    height: 40px;
+    padding: 0 12px;
+    border: none;
+    background: rgba(255,255,255,0.12);
+    border-radius: 8px;
+    cursor: pointer;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.15s;
+    white-space: nowrap;
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .taskbar-item:hover { background: rgba(255,255,255,0.2); }
+  .taskbar-item.active {
+    background: rgba(255,255,255,0.25);
+    border-bottom: 2px solid #0078d7;
+  }
+  .taskbar-item .t-icon { font-size: 16px; }
+
+  #clock {
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    text-align: right;
+    white-space: nowrap;
+    padding: 0 8px;
+    flex-shrink: 0;
+    line-height: 1.4;
+    min-width: 70px;
+  }
+
+  /* ===== START MENU ===== */
+  #start-menu {
+    position: fixed;
+    bottom: 56px;
+    left: 8px;
+    width: 260px;
+    background: rgba(20,20,30,0.92);
+    backdrop-filter: blur(20px);
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.15);
+    padding: 16px;
+    z-index: 9500;
+    display: none;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  }
+  #start-menu.open { display: block; }
+  #start-menu h2 {
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .start-app-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 500;
+    transition: background 0.15s;
+  }
+  .start-app-item:hover { background: rgba(255,255,255,0.12); }
+  .start-app-item .s-icon { font-size: 22px; }
+
+  /* ===== WINDOWS ===== */
+  .window {
+    position: absolute;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.35);
+    min-width: 320px;
+    min-height: 220px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid rgba(0,0,0,0.08);
+    transition: box-shadow 0.15s;
+  }
+  .window.focused { box-shadow: 0 12px 50px rgba(0,0,0,0.45); }
+  .window.minimized { display: none; }
+
+  .window-titlebar {
+    height: 44px;
+    background: linear-gradient(135deg, #0078d7, #00a8e0);
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    cursor: move;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .window-title-icon { font-size: 18px; }
+  .window-title-text {
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .window-controls { display: flex; gap: 6px; }
+  .wc-btn {
+    width: 28px; height: 28px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700;
+    transition: background 0.1s, transform 0.1s;
+    line-height: 1;
+  }
+  .wc-btn:active { transform: scale(0.9); }
+  .wc-min { background: rgba(255,255,255,0.2); color: #fff; }
+  .wc-min:hover { background: rgba(255,255,255,0.35); }
+  .wc-max { background: rgba(255,255,255,0.2); color: #fff; }
+  .wc-max:hover { background: rgba(255,255,255,0.35); }
+  .wc-close { background: rgba(232,17,35,0.8); color: #fff; }
+  .wc-close:hover { background: #e81123; }
+
+  .window-body {
+    flex: 1;
+    overflow: auto;
+    background: #f5f6fa;
+    position: relative;
+  }
+
+  /* ===== FILES APP ===== */
+  .files-app { padding: 16px; }
+  .files-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .files-back-btn {
+    padding: 6px 14px;
+    background: #0078d7;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    transition: background 0.1s;
+  }
+  .files-back-btn:hover { background: #005fa3; }
+  .files-back-btn:disabled { background: #ccc; cursor: default; }
+  .files-path {
+    font-size: 13px;
+    color: #555;
+    font-weight: 600;
+  }
+  .files-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .file-item {
+    width: 90px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 6px;
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: center;
+    transition: background 0.1s;
+  }
+  .file-item:hover { background: rgba(0,120,215,0.1); }
+  .file-item .f-icon { font-size: 38px; }
+  .file-item .f-name { font-size: 12px; color: #333; font-weight: 500; word-break: break-word; line-height: 1.3; }
+
+  /* ===== NOTES APP ===== */
+  .notes-app {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 0;
+  }
+  .notes-toolbar {
+    padding: 10px 14px;
+    background: #fff;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  .notes-save-btn {
+    padding: 8px 20px;
+    background: #0078d7;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 700;
+    transition: background 0.1s;
+  }
+  .notes-save-btn:hover { background: #005fa3; }
+  .notes-status { font-size: 12px; color: #888; }
+  .notes-textarea {
+    flex: 1;
+    width: 100%;
+    border: none;
+    padding: 16px;
+    font-size: 15px;
+    font-family: 'Segoe UI', sans-serif;
+    resize: none;
+    background: #fff;
+    color: #222;
+    line-height: 1.6;
+    outline: none;
+  }
+
+  /* ===== PAINT APP ===== */
+  .paint-app {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+  .paint-toolbar {
+    padding: 8px 12px;
+    background: #fff;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+  }
+  .paint-toolbar label { font-size: 13px; font-weight: 600; color: #444; }
+  .paint-color-picker { width: 36px; height: 36px; border: none; border-radius: 6px; cursor: pointer; padding: 2px; }
+  .paint-size-slider { width: 80px; }
+  .paint-clear-btn {
+    padding: 7px 16px;
+    background: #e81123;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 700;
+    transition: background 0.1s;
+  }
+  .paint-clear-btn:hover { background: #c40e1d; }
+  .paint-canvas-wrap {
+    flex: 1;
+    overflow: hidden;
+    background: #fff;
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
+  }
+  .paint-canvas { cursor: crosshair; display: block; touch-action: none; }
+
+  /* ===== GAMES LAUNCHER ===== */
+  .games-app { padding: 20px; }
+  .games-app h2 { font-size: 18px; color: #333; margin-bottom: 16px; font-weight: 800; }
+  .game-launch-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    background: #fff;
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    cursor: pointer;
+    margin-bottom: 12px;
+    transition: border-color 0.15s, transform 0.1s, box-shadow 0.15s;
+  }
+  .game-launch-item:hover {
+    border-color: #0078d7;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0,120,215,0.2);
+  }
+  .game-launch-item .g-icon { font-size: 32px; }
+  .game-launch-item .g-info h3 { font-size: 16px; color: #222; font-weight: 700; }
+  .game-launch-item .g-info p { font-size: 12px; color: #888; margin-top: 2px; }
+
+  /* ===== SNAKE GAME ===== */
+  .snake-app {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px;
+    gap: 12px;
+    background: #1a1a2e;
+    height: 100%;
+  }
+  .snake-score {
+    color: #00ff88;
+    font-size: 20px;
+    font-weight: 800;
+    font-family: monospace;
+  }
+  #snake-canvas {
+    border: 3px solid #00ff88;
+    border-radius: 8px;
+    background: #0d0d1a;
+  }
+  .snake-msg {
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    text-align: center;
+  }
+  .snake-restart-btn {
+    padding: 10px 28px;
+    background: #00ff88;
+    color: #0d0d1a;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .snake-restart-btn:hover { background: #00cc6a; }
+
+  /* ===== MINESWEEPER ===== */
+  .mines-app {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px;
+    gap: 12px;
+    height: 100%;
+    background: #2d2d44;
+  }
+  .mines-header {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    background: rgba(255,255,255,0.08);
+    padding: 10px 20px;
+    border-radius: 10px;
+    width: 100%;
+    justify-content: center;
+  }
+  .mines-stat {
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .mines-stat span { color: #ffd700; font-size: 20px; }
+  .mines-restart-btn {
+    padding: 8px 20px;
+    background: #ffd700;
+    color: #222;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+  #mines-grid {
+    display: grid;
+    gap: 2px;
+    background: rgba(255,255,255,0.05);
+    padding: 8px;
+    border-radius: 10px;
+  }
+  .mine-cell {
+    width: 36px;
+    height: 36px;
+    background: #4a4a6a;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: background 0.1s;
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #fff;
+  }
+  .mine-cell:hover:not(.revealed):not(.flagged) { background: #5a5a80; }
+  .mine-cell.revealed {
+    background: #1a1a2e;
+    cursor: default;
+    border-color: rgba(255,255,255,0.05);
+  }
+  .mine-cell.flagged { background: #4a4a6a; }
+  .mine-cell.mine-hit { background: #e81123; }
+  .mines-msg {
+    color: #fff;
+    font-size: 16px;
+    font-weight: 800;
+    text-align: center;
+  }
+
+  /* ===== SETTINGS APP ===== */
+  .settings-app { padding: 20px; }
+  .settings-app h2 { font-size: 18px; color: #333; margin-bottom: 20px; font-weight: 800; }
+  .setting-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    background: #fff;
+    border-radius: 10px;
+    margin-bottom: 12px;
+    border: 1px solid #e0e0e0;
+    gap: 16px;
+  }
+  .setting-info h3 { font-size: 15px; color: #222; font-weight: 700; }
+  .setting-info p { font-size: 12px; color: #888; margin-top: 3px; }
+  .toggle-group {
+    display: flex;
+    background: #eee;
+    border-radius: 8px;
+    padding: 3px;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+  .toggle-opt {
+    padding: 6px 14px;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    background: transparent;
+    color: #666;
+    transition: background 0.15s, color 0.15s;
+  }
+  .toggle-opt.active { background: #0078d7; color: #fff; }
+  .wallpaper-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 48px);
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .wallpaper-thumb {
+    width: 48px;
+    height: 32px;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: border-color 0.12s ease-out, filter 0.12s ease-out;
+  }
+  .wallpaper-thumb:hover { filter: brightness(1.08); }
+  .wallpaper-thumb.active { border-color: #0078d7; }
+
+  /* ===== RECYCLE BIN ===== */
+  .recycle-app { padding: 24px; text-align: center; }
+  .recycle-app .rb-icon { font-size: 64px; margin-bottom: 16px; }
+  .recycle-app h2 { font-size: 18px; color: #555; margin-bottom: 8px; }
+  .recycle-app p { font-size: 14px; color: #888; line-height: 1.5; }
+  .recycle-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 16px;
+    text-align: left;
+  }
+  .recycle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    background: #fff;
+  }
+  .recycle-name { font-size: 13px; font-weight: 700; color: #333; }
+  .recycle-actions { display: flex; gap: 8px; flex-shrink: 0; }
+  .recycle-actions button {
+    padding: 6px 8px;
+    border: none;
+    border-radius: 8px;
+    background: #0078d7;
+    color: #fff;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 700;
+    transition: filter 0.12s ease-out;
+  }
+  .recycle-actions button:hover { filter: brightness(1.12); }
+  .recycle-actions .danger { background: #c40e1d; }
+
+  /* ===== SCROLLBAR ===== */
+  .window-body::-webkit-scrollbar { width: 6px; }
+  .window-body::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 3px; }
+
+  /* ===== RESIZE HANDLE ===== */
+  .window-resize-handle {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 16px;
+    height: 16px;
+    cursor: se-resize;
+    z-index: 10;
+  }
+  .window-resize-handle::after {
+    content: '⠿';
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    font-size: 10px;
+    color: rgba(0,0,0,0.2);
+  }
+  /* ===== SYSTEM OVERLAYS ===== */
+  #context-menu {
+    position: fixed;
+    top: 0;
+    left: 0;
+    min-width: 176px;
+    padding: 8px;
+    background: rgba(24,24,32,0.96);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px;
+    z-index: 12000;
+    display: none;
+    flex-direction: column;
+    gap: 0;
+  }
+  #context-menu.open { display: flex; }
+  .context-menu-item {
+    width: 100%;
+    padding: 8px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: #fff;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: left;
+    white-space: nowrap;
+    transition: background 0.12s ease-out;
+  }
+  .context-menu-item:hover { background: rgba(255,255,255,0.12); }
+
+  /* ===== GLOBAL THEMES ===== */
+  body.theme-dark #taskbar,
+  body.theme-dark #context-menu,
+  body.theme-dark #start-menu {
+    background: rgba(18,19,25,0.94);
+    color: #f5f6fa;
+  }
+  body.theme-dark #desktop::before {
+    background: rgba(0,0,0,0.22);
+  }
+  body.theme-dark .window { background: #232532; border-color: rgba(255,255,255,0.12); }
+  body.theme-dark .window-body,
+  body.theme-dark .files-app,
+  body.theme-dark .notes-app,
+  body.theme-dark .paint-app,
+  body.theme-dark .games-app,
+  body.theme-dark .settings-app,
+  body.theme-dark .recycle-app { background: #20212b; color: #f5f6fa; }
+  body.theme-dark .file-item:hover { background: rgba(255,255,255,0.1); }
+  body.theme-dark .file-item .f-name,
+  body.theme-dark .games-app h2,
+  body.theme-dark .game-launch-item .g-info h3,
+  body.theme-dark .paint-toolbar label,
+  body.theme-dark .setting-info h3,
+  body.theme-dark .settings-app h2,
+  body.theme-dark .recycle-name,
+  body.theme-dark .recycle-app h2 { color: #f5f6fa; }
+  body.theme-dark .setting-info p,
+  body.theme-dark .game-launch-item .g-info p,
+  body.theme-dark .recycle-app p,
+  body.theme-dark .notes-status,
+  body.theme-dark .files-path { color: #b8bdc8; }
+  body.theme-dark .setting-item,
+  body.theme-dark .game-launch-item,
+  body.theme-dark .recycle-row,
+  body.theme-dark .notes-toolbar,
+  body.theme-dark .paint-toolbar { background: #2b2d38; border-color: #3c4050; }
+  body.theme-dark .toggle-group { background: #1b1c24; }
+  body.theme-dark .toggle-opt { color: #cdd3df; }
+  body.theme-dark .notes-textarea { background: #1b1c24; color: #f5f6fa; }
+
+
+  /* ===== XBOX / TV MODE ===== */
+  #xbox-hint {
+    position: fixed;
+    left: 16px;
+    bottom: 64px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: rgba(24,24,32,0.88);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    z-index: 13000;
+    pointer-events: none;
+    display: none;
+    max-width: calc(100vw - 32px);
+  }
+  body.xbox-mode #xbox-hint { display: block; }
+  body.xbox-mode .desktop-icon {
+    width: 104px;
+    min-height: 104px;
+    padding: 12px 8px;
+    gap: 8px;
+  }
+  body.xbox-mode .desktop-icon .icon-img { font-size: 48px; }
+  body.xbox-mode .desktop-icon .icon-label { font-size: 14px; line-height: 1.25; }
+  body.xbox-mode .taskbar-item,
+  body.xbox-mode .start-app-item,
+  body.xbox-mode .context-menu-item,
+  body.xbox-mode .toggle-opt,
+  body.xbox-mode .notes-save-btn,
+  body.xbox-mode .files-back-btn,
+  body.xbox-mode .game-launch-item,
+  body.xbox-mode .recycle-actions button {
+    min-height: 44px;
+  }
+  body.xbox-mode #start-btn { width: 48px; height: 48px; }
+  body.xbox-mode .window-titlebar { height: 48px; }
+  body.xbox-mode .wc-btn { width: 32px; height: 32px; }
+  body.xbox-mode .controller-focused {
+    outline: 3px solid #00bcff;
+    outline-offset: 3px;
+    box-shadow: 0 0 0 4px rgba(0,188,255,0.22);
+  }
+  body.xbox-mode #virtual-cursor {
+    width: 14px;
+    height: 14px;
+    border-width: 3px;
+  }
+  body.xbox-mode #context-menu { min-width: 208px; }
+  body.xbox-mode .context-menu-item { font-size: 15px; padding: 10px 12px; }
+
+  #virtual-cursor {
+    position: fixed;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #fff;
+    border: 2px solid #111;
+    pointer-events: none;
+    z-index: 13000;
+    display: none;
+  }
+  #controller-toast {
+    position: fixed;
+    right: 16px;
+    bottom: 64px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    background: rgba(24,24,32,0.92);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    z-index: 13000;
+    opacity: 0;
+    transform: translateY(8px);
+    pointer-events: none;
+    transition: opacity 0.12s ease-out, transform 0.12s ease-out;
+  }
+  #controller-toast.show {
+    opacity: 1;
+    transform: translateY(0);
+  }
+</style>
+</head>
+<body>
+
+<div id="desktop"></div>
+<div id="selection-box"></div>
+
+<div id="taskbar" class="style-left">
+  <button id="start-btn" title="Start">🪟</button>
+  <div id="taskbar-apps"></div>
+  <div id="clock"></div>
+</div>
+
+<div id="start-menu">
+  <h2>📂 Apps</h2>
+</div>
+
+<div id="context-menu"></div>
+<div id="virtual-cursor"></div>
+<div id="controller-toast">Controller connected</div>
+<div id="xbox-hint">🎮 Xbox Mode: Left stick cursor · D-pad focus · A open · B menu/back · X/☰ Start · Y Settings</div>
+
+<script>
+// ============================================================
+// STATE
+// ============================================================
+function parseJSON(value, fallback) {
+  try { return value ? JSON.parse(value) : fallback; }
+  catch (_) { return fallback; }
+}
+
+function escapeHTML(value) {
+  return String(value).replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[ch]));
+}
+
+function readStoredState() {
+  const legacySettings = parseJSON(localStorage.getItem('kidos_settings'), {});
+  const legacyPositions = parseJSON(localStorage.getItem('kidos_icon_positions'), {});
+  const stored = parseJSON(localStorage.getItem('osState'), {});
+  const base = {
+    settings: { taskbarStyle: 'left', theme: 'light', wallpaper: 'sky', xboxMode: false },
+    iconPositions: {},
+    iconNames: {},
+    deletedIcons: [],
+    permanentDeleted: [],
+    openWindows: [],
+    notes: localStorage.getItem('kidos_notes') || '',
+  };
+  return Object.assign(base, stored, {
+    settings: Object.assign(base.settings, legacySettings, stored.settings || {}),
+    iconPositions: Object.assign({}, legacyPositions, stored.iconPositions || {}),
+    iconNames: stored.iconNames || {},
+    deletedIcons: stored.deletedIcons || [],
+    permanentDeleted: stored.permanentDeleted || [],
+    openWindows: stored.openWindows || [],
+    notes: stored.notes !== undefined ? stored.notes : base.notes,
+  });
+}
+
+const osState = readStoredState();
+const state = {
+  settings: osState.settings,
+  iconPositions: osState.iconPositions,
+  iconNames: osState.iconNames,
+  deletedIcons: osState.deletedIcons,
+  permanentDeleted: osState.permanentDeleted,
+  savedOpenWindows: osState.openWindows,
+  notes: osState.notes,
+  openWindows: {},
+  zTop: 100,
+  selectedIcon: null,
+  selectedIcons: new Set(),
+};
+
+function saveOSState() {
+  osState.settings = state.settings;
+  osState.iconPositions = state.iconPositions;
+  osState.iconNames = state.iconNames;
+  osState.deletedIcons = state.deletedIcons;
+  osState.permanentDeleted = state.permanentDeleted;
+  osState.openWindows = Object.values(state.openWindows)
+    .filter(w => !w.minimized)
+    .map(w => ({
+      appId: w.appId,
+      left: w.el.offsetLeft,
+      top: w.el.offsetTop,
+      width: w.el.offsetWidth,
+      height: w.el.offsetHeight,
+    }));
+  osState.notes = state.notes;
+  localStorage.setItem('osState', JSON.stringify(osState));
+}
+
+// ============================================================
+// APP REGISTRY
+// ============================================================
+const APPS = [
+  { id: 'files',      label: 'Files',        icon: '📁', desktopPos: { top: 20, left: 20 } },
+  { id: 'notes',      label: 'Notes',        icon: '📝', desktopPos: { top: 120, left: 20 } },
+  { id: 'paint',      label: 'Paint',        icon: '🎨', desktopPos: { top: 220, left: 20 } },
+  { id: 'games',      label: 'Games',        icon: '🎮', desktopPos: { top: 320, left: 20 } },
+  { id: 'settings',   label: 'Settings',     icon: '⚙️', desktopPos: { top: 420, left: 20 } },
+  { id: 'recycle',    label: 'Recycle Bin',  icon: '🗑️', desktopPos: { top: 520, left: 20 } },
+];
+
+const WALLPAPERS = [
+  { id: 'sky', css: 'linear-gradient(135deg, #1a8fe3 0%, #6ec6f5 40%, #b8e4ff 70%, #a0d8ef 100%)' },
+  { id: 'mint', css: 'linear-gradient(135deg, #0f9f8f 0%, #6ed6a8 48%, #d9f7c7 100%)' },
+  { id: 'sunset', css: 'linear-gradient(135deg, #2948a8 0%, #e45f7a 52%, #ffd166 100%)' },
+  { id: 'graphite', css: 'linear-gradient(135deg, #202632 0%, #596475 50%, #aeb6c2 100%)' },
+  { id: 'berry', css: 'linear-gradient(135deg, #4b134f 0%, #8e3f65 45%, #f2a6a6 100%)' },
+];
+
+function saveSettings() {
+  saveOSState();
+}
+
+function applyAppearance() {
+  const theme = state.settings.theme || 'light';
+  const wallpaper = WALLPAPERS.find(w => w.id === state.settings.wallpaper) || WALLPAPERS[0];
+  document.body.classList.toggle('theme-dark', theme === 'dark');
+  document.body.classList.toggle('theme-light', theme !== 'dark');
+  document.body.classList.toggle('xbox-mode', !!state.settings.xboxMode);
+  document.getElementById('desktop').style.setProperty('--wallpaper', wallpaper.css);
+  if (typeof DesktopGrid !== 'undefined') DesktopGrid.configureForMode();
+}
+
+function toggleTheme() {
+  state.settings.theme = state.settings.theme === 'dark' ? 'light' : 'dark';
+  saveSettings();
+  applyAppearance();
+}
+
+// ============================================================
+// DESKTOP ICON GRID
+// ============================================================
+const DesktopGrid = {
+  size: 96,
+  iconW: 80,
+  iconH: 88,
+
+  configureForMode() {
+    if (state.settings.xboxMode) {
+      this.size = 120;
+      this.iconW = 104;
+      this.iconH = 112;
+    } else {
+      this.size = 96;
+      this.iconW = 80;
+      this.iconH = 88;
+    }
+  },
+
+  defaultPos(app) {
+    return state.iconPositions[app.id] || app.desktopPos;
+  },
+
+  snapAll() {
+    const used = new Set();
+    document.querySelectorAll('.desktop-icon').forEach(icon => {
+      const pos = this.findSlot(this.num(icon.style.left), this.num(icon.style.top), used);
+      this.place(icon, pos.left, pos.top);
+      used.add(pos.key);
+    });
+    this.save();
+  },
+
+  snapIcon(icon) {
+    const used = new Set();
+    document.querySelectorAll('.desktop-icon').forEach(other => {
+      if (other !== icon) used.add(this.slotKey(other.offsetLeft, other.offsetTop));
+    });
+    const pos = this.findSlot(icon.offsetLeft, icon.offsetTop, used);
+    this.place(icon, pos.left, pos.top);
+    this.save();
+  },
+
+  findSlot(left, top, used) {
+    const maxCol = Math.max(0, Math.floor((window.innerWidth - this.iconW) / this.size));
+    const maxRow = Math.max(0, Math.floor((window.innerHeight - 52 - this.iconH) / this.size));
+    const startCol = Math.max(0, Math.min(maxCol, Math.round(left / this.size)));
+    const startRow = Math.max(0, Math.min(maxRow, Math.round(top / this.size)));
+
+    for (let radius = 0; radius <= Math.max(maxCol, maxRow) + 1; radius++) {
+      for (let row = Math.max(0, startRow - radius); row <= Math.min(maxRow, startRow + radius); row++) {
+        for (let col = Math.max(0, startCol - radius); col <= Math.min(maxCol, startCol + radius); col++) {
+          const key = col + ',' + row;
+          if (!used.has(key)) return { left: col * this.size, top: row * this.size, key };
+        }
+      }
+    }
+    return { left: startCol * this.size, top: startRow * this.size, key: startCol + ',' + startRow };
+  },
+
+  slotKey(left, top) {
+    return Math.round(left / this.size) + ',' + Math.round(top / this.size);
+  },
+
+  num(value) {
+    return Number(String(value).replace('px', '')) || 0;
+  },
+
+  place(icon, left, top) {
+    icon.style.left = left + 'px';
+    icon.style.top = top + 'px';
+  },
+
+  save() {
+    document.querySelectorAll('.desktop-icon').forEach(icon => {
+      state.iconPositions[icon.dataset.appId] = { top: icon.offsetTop, left: icon.offsetLeft };
+    });
+    saveOSState();
+  }
+};
+
+function getApp(appId) {
+  return APPS.find(app => app.id === appId);
+}
+
+function isIconDeleted(appId) {
+  return state.deletedIcons.some(item => item.id === appId);
+}
+
+function isIconPermanentlyDeleted(appId) {
+  return state.permanentDeleted.includes(appId);
+}
+
+function iconLabel(app) {
+  return state.iconNames[app.id] || app.label;
+}
+
+function clearIconSelection() {
+  document.querySelectorAll('.desktop-icon').forEach(icon => icon.classList.remove('selected'));
+  state.selectedIcons.clear();
+  state.selectedIcon = null;
+}
+
+function selectIcon(icon, additive = false) {
+  if (!additive) clearIconSelection();
+  icon.classList.add('selected');
+  state.selectedIcons.add(icon.dataset.appId);
+  state.selectedIcon = icon.dataset.appId;
+  ControllerInput.setFocus(icon);
+}
+
+function updateIconLabel(icon) {
+  const app = getApp(icon.dataset.appId);
+  const label = icon.querySelector('.icon-label');
+  if (app && label) label.textContent = iconLabel(app);
+}
+
+function startIconRename(icon) {
+  if (!icon || icon.classList.contains('renaming')) return;
+  const app = getApp(icon.dataset.appId);
+  if (!app) return;
+  const label = icon.querySelector('.icon-label');
+  const oldName = iconLabel(app);
+  icon.classList.add('renaming');
+  label.textContent = '';
+  const input = document.createElement('input');
+  input.className = 'icon-rename-input';
+  input.value = oldName;
+  label.appendChild(input);
+  input.focus();
+  input.select();
+  let done = false;
+
+  function finish(save) {
+    if (done) return;
+    done = true;
+    const next = input.value.trim();
+    if (save && next) {
+      state.iconNames[app.id] = next;
+      saveOSState();
+    }
+    icon.classList.remove('renaming');
+    updateIconLabel(icon);
+  }
+
+  input.addEventListener('click', e => e.stopPropagation());
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') finish(true);
+    if (e.key === 'Escape') finish(false);
+  });
+  input.addEventListener('blur', () => finish(true));
+}
+
+function softDeleteIcon(icon) {
+  const app = icon && getApp(icon.dataset.appId);
+  if (!app || app.id === 'recycle') return;
+  if (!isIconDeleted(app.id)) {
+    state.deletedIcons.push({
+      id: app.id,
+      label: iconLabel(app),
+      icon: app.icon,
+      position: state.iconPositions[app.id] || { top: icon.offsetTop, left: icon.offsetLeft },
+    });
+  }
+  icon.remove();
+  clearIconSelection();
+  saveOSState();
+  if (state.openWindows.recycle) {
+    WindowManager.close('recycle');
+    openRecycleApp();
+  }
+}
+
+function restoreIcon(appId) {
+  const item = state.deletedIcons.find(entry => entry.id === appId);
+  if (!item) return;
+  state.deletedIcons = state.deletedIcons.filter(entry => entry.id !== appId);
+  if (item.position) state.iconPositions[appId] = item.position;
+  if (item.label) state.iconNames[appId] = item.label;
+  renderDesktopIcons();
+  saveOSState();
+  if (state.openWindows.recycle) WindowManager.close('recycle');
+  openRecycleApp();
+}
+
+function deleteIconPermanently(appId) {
+  state.deletedIcons = state.deletedIcons.filter(entry => entry.id !== appId);
+  delete state.iconPositions[appId];
+  delete state.iconNames[appId];
+  if (!state.permanentDeleted.includes(appId)) state.permanentDeleted.push(appId);
+  saveOSState();
+  if (state.openWindows.recycle) WindowManager.close('recycle');
+  openRecycleApp();
+}
+
+// ============================================================
+// CONTEXT MENU
+// ============================================================
+const ContextMenu = {
+  el: null,
+  targetIcon: null,
+
+  init() {
+    this.el = document.getElementById('context-menu');
+
+    document.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      const icon = e.target.closest('.desktop-icon');
+      if (icon) {
+        selectIcon(icon);
+        this.open(e.clientX, e.clientY, icon);
+      } else if (e.target.closest('#desktop') && !e.target.closest('.window')) {
+        this.open(e.clientX, e.clientY, null);
+      } else {
+        this.close();
+      }
+    });
+
+    document.addEventListener('click', e => {
+      if (!this.el.contains(e.target)) this.close();
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') this.close();
+      if (e.key === 'F2' && state.selectedIcon) {
+        const icon = document.querySelector(`.desktop-icon[data-app-id="${state.selectedIcon}"]`);
+        if (icon) startIconRename(icon);
+      }
+    });
+    window.addEventListener('blur', () => this.close());
+  },
+
+  open(x, y, icon) {
+    this.targetIcon = icon;
+    const items = icon
+      ? [{ label: 'Open', action: 'open' }, { label: 'Rename', action: 'rename' }, { label: 'Delete', action: 'delete' }]
+      : [
+          { label: 'Refresh', action: 'refresh' },
+          { label: 'Settings', action: 'settings' },
+          { label: 'New Note', action: 'new-note' },
+          { label: 'Change Wallpaper', action: 'wallpaper' },
+          { label: 'Toggle Theme', action: 'theme' },
+          { label: state.settings.xboxMode ? 'Xbox Mode Off' : 'Xbox Mode On', action: 'xbox-mode' },
+        ];
+
+    this.el.innerHTML = items.map(item =>
+      `<button class="context-menu-item" data-action="${item.action}">${item.label}</button>`
+    ).join('');
+
+    this.el.querySelectorAll('.context-menu-item').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        this.run(btn.dataset.action);
+      });
+    });
+    const firstItem = this.el.querySelector('.context-menu-item');
+    if (firstItem && typeof ControllerInput !== 'undefined') ControllerInput.setFocus(firstItem);
+
+    this.el.classList.add('open');
+    this.el.style.left = '0px';
+    this.el.style.top = '0px';
+    const rect = this.el.getBoundingClientRect();
+    const left = Math.max(0, Math.min(window.innerWidth - rect.width - 8, x));
+    const top = Math.max(0, Math.min(window.innerHeight - rect.height - 8, y));
+    this.el.style.left = left + 'px';
+    this.el.style.top = top + 'px';
+  },
+
+  openForElement(el) {
+    if (!el) return false;
+    const rect = el.getBoundingClientRect();
+    const icon = el.closest('.desktop-icon');
+    this.open(rect.left + Math.min(24, rect.width / 2), rect.top + Math.min(24, rect.height / 2), icon);
+    return true;
+  },
+
+  close() {
+    if (!this.el) return;
+    this.el.classList.remove('open');
+    if (ControllerInput.focusedEl && ControllerInput.focusedEl.closest('#context-menu')) {
+      ControllerInput.setFocus(null);
+    }
+    this.targetIcon = null;
+  },
+
+  run(action) {
+    const icon = this.targetIcon;
+    this.close();
+    if (action === 'refresh') {
+      window.location.reload();
+    } else if (action === 'settings' || action === 'wallpaper') {
+      openApp('settings');
+    } else if (action === 'new-note') {
+      openApp('notes');
+    } else if (action === 'theme') {
+      toggleTheme();
+    } else if (action === 'xbox-mode') {
+      state.settings.xboxMode = !state.settings.xboxMode;
+      saveSettings();
+      applyAppearance();
+      renderDesktopIcons();
+    } else if (action === 'open' && icon) {
+      openApp(icon.dataset.appId);
+    } else if (action === 'rename' && icon) {
+      selectIcon(icon);
+      startIconRename(icon);
+    } else if (action === 'delete' && icon) {
+      softDeleteIcon(icon);
+    }
+  }
+};
+
+// ============================================================
+// CONTROLLER INPUT
+// ============================================================
+const ControllerInput = {
+  cursor: { x: Math.floor(window.innerWidth / 2), y: Math.floor(window.innerHeight / 2) },
+  prevButtons: {},
+  connected: false,
+  focusedEl: null,
+  hoveredEl: null,
+  navLatch: false,
+  snakeHandlers: new Set(),
+  toastTimer: null,
+
+  init() {
+    this.cursorEl = document.getElementById('virtual-cursor');
+    this.toastEl = document.getElementById('controller-toast');
+    window.addEventListener('gamepadconnected', () => this.setConnected(true));
+    window.addEventListener('gamepaddisconnected', () => this.setConnected(false));
+    this.loop();
+  },
+
+  registerSnake(handler) {
+    this.snakeHandlers.add(handler);
+    return () => this.snakeHandlers.delete(handler);
+  },
+
+  loop() {
+    const pads = navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(Boolean) : [];
+    const pad = pads[0];
+    this.setConnected(!!pad);
+
+    if (pad) {
+      const ax = this.deadzone(pad.axes[0] || 0);  // Left stick X
+      const ay = this.deadzone(pad.axes[1] || 0);  // Left stick Y
+      const rx = this.deadzone(pad.axes[2] || 0);  // Right stick X
+      const ry = this.deadzone(pad.axes[3] || 0);  // Right stick Y
+      
+      const moved = ax !== 0 || ay !== 0;
+      this.moveCursor(ax, ay);
+      if (moved) this.handleCursorHover();
+      
+      this.handleNav(pad, ax, ay);
+      this.handleRightStickScroll(ry);
+      this.snakeHandlers.forEach(handler => handler(pad, ax, ay));
+
+      if (this.buttonPressed(pad, 0)) this.activateFocused();
+      if (this.buttonPressed(pad, 1)) this.smartBackOrContext();
+      if (this.buttonPressed(pad, 2)) this.toggleStart();
+      if (this.buttonPressed(pad, 3)) openApp('settings');
+      if (this.buttonPressed(pad, 8)) this.smartBackOrContext();       // View/Back = back/menu
+      if (this.buttonPressed(pad, 9)) this.toggleStart();              // Menu/Start = Start menu
+      if (this.buttonPressed(pad, 7)) this.dispatchPointer('left');    // RT = left click
+      if (this.buttonPressed(pad, 6)) this.dispatchPointer('right');   // LT = right click
+      this.storeButtons(pad);
+    } else {
+      this.prevButtons = {};
+      this.hoveredEl = null;
+    }
+
+    requestAnimationFrame(() => this.loop());
+  },
+
+  deadzone(v) {
+    return Math.abs(v) < 0.15 ? 0 : v;
+  },
+
+  moveCursor(ax, ay) {
+    if (!this.connected) return;
+    this.cursor.x = Math.max(0, Math.min(window.innerWidth - 1, this.cursor.x + ax * 9));
+    this.cursor.y = Math.max(0, Math.min(window.innerHeight - 1, this.cursor.y + ay * 9));
+    this.cursorEl.style.display = 'block';
+    this.cursorEl.style.transform = `translate(${Math.round(this.cursor.x)}px, ${Math.round(this.cursor.y)}px)`;
+  },
+
+  buttonPressed(pad, index) {
+    const pressed = !!(pad.buttons[index] && pad.buttons[index].pressed);
+    return pressed && !this.prevButtons[index];
+  },
+
+  storeButtons(pad) {
+    pad.buttons.forEach((button, index) => {
+      this.prevButtons[index] = !!button.pressed;
+    });
+  },
+
+  navVector(pad, ax, ay) {
+    // D-pad only (buttons 12-15): up, down, left, right
+    const dx = (pad.buttons[15] && pad.buttons[15].pressed ? 1 : 0) - (pad.buttons[14] && pad.buttons[14].pressed ? 1 : 0);
+    const dy = (pad.buttons[13] && pad.buttons[13].pressed ? 1 : 0) - (pad.buttons[12] && pad.buttons[12].pressed ? 1 : 0);
+    return { x: dx, y: dy };
+  },
+
+  handleNav(pad, ax, ay) {
+    const v = this.navVector(pad, ax, ay);
+    if (!v.x && !v.y) {
+      this.navLatch = false;
+      return;
+    }
+    if (this.navLatch) return;
+    this.navLatch = true;
+    this.moveFocus(v.x, v.y);
+  },
+
+  handleRightStickScroll(ry) {
+    if (!ry) return;
+    // Find focused window and scroll its content
+    const focusedWin = document.querySelector('.window.focused');
+    if (!focusedWin) return;
+    const body = focusedWin.querySelector('.window-body');
+    if (!body) return;
+    // Scroll: ry < 0 = down, ry > 0 = up
+    body.scrollTop += ry * 15;
+  },
+
+  focusables() {
+    const base = Array.from(document.querySelectorAll('.desktop-icon, .taskbar-item'));
+    const start = document.getElementById('start-menu');
+    if (start && start.classList.contains('open')) {
+      base.push(...start.querySelectorAll('.start-app-item'));
+    }
+    const menu = document.getElementById('context-menu');
+    if (menu && menu.classList.contains('open')) {
+      base.push(...menu.querySelectorAll('.context-menu-item'));
+    }
+    return base.filter(el => el.offsetParent !== null || el.classList.contains('desktop-icon'));
+  },
+
+  setFocus(el) {
+    if (this.focusedEl) this.focusedEl.classList.remove('controller-focused');
+    this.focusedEl = el;
+    if (el) el.classList.add('controller-focused');
+  },
+
+  moveFocus(dx, dy) {
+    const items = this.focusables();
+    if (!items.length) {
+      this.setFocus(null);
+      return;
+    }
+    if (!this.focusedEl || !items.includes(this.focusedEl)) {
+      this.setFocus(items[0]);
+      return;
+    }
+
+    const current = this.focusedEl.getBoundingClientRect();
+    const cx = current.left + current.width / 2;
+    const cy = current.top + current.height / 2;
+    let best = null;
+    let bestScore = Infinity;
+    items.forEach(el => {
+      if (el === this.focusedEl) return;
+      const rect = el.getBoundingClientRect();
+      const tx = rect.left + rect.width / 2;
+      const ty = rect.top + rect.height / 2;
+      const vx = tx - cx;
+      const vy = ty - cy;
+      if ((dx && Math.sign(vx) !== dx) || (dy && Math.sign(vy) !== dy)) return;
+      const primary = dx ? Math.abs(vx) : Math.abs(vy);
+      const secondary = dx ? Math.abs(vy) : Math.abs(vx);
+      const score = primary + secondary * 1.5;
+      if (score < bestScore) {
+        best = el;
+        bestScore = score;
+      }
+    });
+    if (best) this.setFocus(best);
+  },
+
+  activateFocused() {
+    if (this.focusedEl && document.body.contains(this.focusedEl)) {
+      this.focusedEl.click();
+      return;
+    }
+    this.dispatchPointer('left');
+  },
+
+  contextFocused() {
+    if (this.focusedEl && document.body.contains(this.focusedEl) && ContextMenu.openForElement(this.focusedEl)) return;
+    this.dispatchPointer('right');
+  },
+
+  smartBackOrContext() {
+    const contextMenu = document.getElementById('context-menu');
+    const startMenu = document.getElementById('start-menu');
+    if (contextMenu && contextMenu.classList.contains('open')) {
+      ContextMenu.close();
+      return;
+    }
+    if (startMenu && startMenu.classList.contains('open')) {
+      closeStartMenu();
+      return;
+    }
+    this.contextFocused();
+  },
+
+  toggleStart() {
+    const menu = document.getElementById('start-menu');
+    menu.classList.add('open');
+    this.setFocus(menu.querySelector('.start-app-item'));
+  },
+
+  dispatchPointer(button) {
+    const x = Math.round(this.cursor.x);
+    const y = Math.round(this.cursor.y);
+    const target = document.elementFromPoint(x, y);
+    if (!target) return;
+    
+    if (button === 'right') {
+      target.dispatchEvent(new MouseEvent('contextmenu', {
+        bubbles: true, cancelable: true, clientX: x, clientY: y, button: 2, buttons: 2
+      }));
+      return;
+    }
+    
+    // Left click
+    // If clicking outside a desktop icon on the desktop, deselect all
+    if (target === document.getElementById('desktop') || (target.closest('#desktop') && !target.classList.contains('desktop-icon'))) {
+      clearIconSelection();
+    }
+    
+    target.dispatchEvent(new MouseEvent('mousedown', {
+      bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, buttons: 1
+    }));
+    target.dispatchEvent(new MouseEvent('mouseup', {
+      bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, buttons: 0
+    }));
+    target.dispatchEvent(new MouseEvent('click', {
+      bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, buttons: 0
+    }));
+  },
+
+  handleCursorHover() {
+    const x = Math.round(this.cursor.x);
+    const y = Math.round(this.cursor.y);
+    const target = document.elementFromPoint(x, y);
+    
+    // Handle leaving previous element
+    if (this.hoveredEl && this.hoveredEl !== target) {
+      this.hoveredEl.classList.remove('controller-hover');
+      this.hoveredEl = null;
+    }
+    
+    if (!target) return;
+    
+    // Only apply controller-hover to desktop-icon elements
+    if (target.classList.contains('desktop-icon')) {
+      if (this.hoveredEl !== target) {
+        target.classList.add('controller-hover');
+        this.hoveredEl = target;
+      }
+    } else if (this.hoveredEl) {
+      this.hoveredEl.classList.remove('controller-hover');
+      this.hoveredEl = null;
+    }
+  },
+
+  setConnected(isConnected) {
+    if (this.connected === isConnected) return;
+    this.connected = isConnected;
+    if (this.cursorEl) this.cursorEl.style.display = isConnected ? 'block' : 'none';
+    if (isConnected) this.showToast();
+  },
+
+  showToast() {
+    this.toastEl.classList.add('show');
+    clearTimeout(this.toastTimer);
+    this.toastTimer = setTimeout(() => this.toastEl.classList.remove('show'), 1800);
+  }
+};
+
+// ============================================================
+// WINDOW MANAGER
+// ============================================================
+const WindowManager = {
+  create(appId, title, icon, contentFn, opts = {}) {
+    // If already open, just focus it
+    if (state.openWindows[appId] && !opts.allowMultiple) {
+      this.focus(appId);
+      this.restore(appId);
+      return state.openWindows[appId];
+    }
+
+    const winId = opts.allowMultiple ? (appId + '_' + Date.now()) : appId;
+
+    const win = document.createElement('div');
+    win.className = 'window';
+    win.dataset.winId = winId;
+
+    const w = opts.width || 560;
+    const h = opts.height || 420;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight - 52;
+    const x = opts.x !== undefined ? opts.x : Math.max(0, Math.floor((vw - w) / 2) + Math.floor(Math.random() * 60 - 30));
+    const y = opts.y !== undefined ? opts.y : Math.max(0, Math.floor((vh - h) / 2) + Math.floor(Math.random() * 40 - 20));
+
+    win.style.cssText = `left:${x}px;top:${y}px;width:${w}px;height:${h}px;z-index:${++state.zTop}`;
+
+    win.innerHTML = `
+      <div class="window-titlebar" data-win-id="${winId}">
+        <span class="window-title-icon">${icon}</span>
+        <span class="window-title-text">${title}</span>
+        <div class="window-controls">
+          <button class="wc-btn wc-min" title="Minimize">—</button>
+          <button class="wc-btn wc-max" title="Maximize">⛶</button>
+          <button class="wc-btn wc-close" title="Close">✕</button>
+        </div>
+      </div>
+      <div class="window-body" id="wbody-${winId}"></div>
+      <div class="window-resize-handle" data-win-id="${winId}"></div>
+    `;
+
+    document.getElementById('desktop').appendChild(win);
+
+    // Inject content
+    const body = document.getElementById('wbody-' + winId);
+    if (typeof contentFn === 'function') contentFn(body, winId);
+
+    // Store in state
+    state.openWindows[winId] = {
+      el: win, id: winId, appId, title, icon,
+      minimized: false, maximized: false,
+      prevRect: null,
+    };
+
+    // Wire controls
+    win.querySelector('.wc-min').addEventListener('click', () => this.minimize(winId));
+    win.querySelector('.wc-max').addEventListener('click', () => this.toggleMaximize(winId));
+    win.querySelector('.wc-close').addEventListener('click', () => this.close(winId));
+    win.addEventListener('mousedown', () => this.focus(winId));
+
+    // Dragging
+    this._makeDraggable(win, win.querySelector('.window-titlebar'));
+    // Resizing
+    this._makeResizable(win, win.querySelector('.window-resize-handle'));
+
+    // Add to taskbar
+    this._addTaskbarItem(winId);
+
+    this.focus(winId);
+    if (!opts.restoring) saveOSState();
+    return state.openWindows[winId];
+  },
+
+  focus(winId) {
+    Object.values(state.openWindows).forEach(w => {
+      w.el.classList.remove('focused');
+      const ti = document.querySelector(`.taskbar-item[data-win-id="${w.id}"]`);
+      if (ti) ti.classList.remove('active');
+    });
+    const w = state.openWindows[winId];
+    if (!w) return;
+    w.el.style.zIndex = ++state.zTop;
+    w.el.classList.add('focused');
+    const ti = document.querySelector(`.taskbar-item[data-win-id="${winId}"]`);
+    if (ti) ti.classList.add('active');
+  },
+
+  minimize(winId) {
+    const w = state.openWindows[winId];
+    if (!w) return;
+    w.minimized = true;
+    w.el.classList.add('minimized');
+    const ti = document.querySelector(`.taskbar-item[data-win-id="${winId}"]`);
+    if (ti) ti.classList.remove('active');
+  },
+
+  restore(winId) {
+    const w = state.openWindows[winId];
+    if (!w) return;
+    w.minimized = false;
+    w.el.classList.remove('minimized');
+    this.focus(winId);
+  },
+
+  toggleMaximize(winId) {
+    const w = state.openWindows[winId];
+    if (!w) return;
+    if (!w.maximized) {
+      w.prevRect = { left: w.el.style.left, top: w.el.style.top, width: w.el.style.width, height: w.el.style.height };
+      w.el.style.cssText += `left:0!important;top:0!important;width:100vw!important;height:calc(100vh - 52px)!important;`;
+      w.maximized = true;
+    } else {
+      const r = w.prevRect;
+      w.el.style.left = r.left;
+      w.el.style.top = r.top;
+      w.el.style.width = r.width;
+      w.el.style.height = r.height;
+      w.maximized = false;
+    }
+    saveOSState();
+  },
+
+  close(winId) {
+    const w = state.openWindows[winId];
+    if (!w) return;
+    w.el.remove();
+    const ti = document.querySelector(`.taskbar-item[data-win-id="${winId}"]`);
+    if (ti) ti.remove();
+    delete state.openWindows[winId];
+    saveOSState();
+  },
+
+  _addTaskbarItem(winId) {
+    const w = state.openWindows[winId];
+    const btn = document.createElement('button');
+    btn.className = 'taskbar-item';
+    btn.dataset.winId = winId;
+    btn.innerHTML = `<span class="t-icon">${w.icon}</span><span>${w.title}</span>`;
+    btn.addEventListener('click', () => {
+      if (w.minimized) {
+        this.restore(winId);
+      } else if (w.el.classList.contains('focused')) {
+        this.minimize(winId);
+      } else {
+        this.focus(winId);
+      }
+    });
+    document.getElementById('taskbar-apps').appendChild(btn);
+  },
+
+  _makeDraggable(win, handle) {
+    let dragging = false, ox = 0, oy = 0;
+    handle.addEventListener('mousedown', e => {
+      if (e.target.classList.contains('wc-btn')) return;
+      const w = state.openWindows[win.dataset.winId];
+      if (w && w.maximized) return;
+      dragging = true;
+      ox = e.clientX - win.offsetLeft;
+      oy = e.clientY - win.offsetTop;
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', e => {
+      if (!dragging) return;
+      const x = Math.max(0, Math.min(window.innerWidth - win.offsetWidth, e.clientX - ox));
+      const y = Math.max(0, Math.min(window.innerHeight - 52 - win.offsetHeight, e.clientY - oy));
+      win.style.left = x + 'px';
+      win.style.top = y + 'px';
+    });
+    document.addEventListener('mouseup', () => {
+      if (dragging) saveOSState();
+      dragging = false;
+    });
+  },
+
+  _makeResizable(win, handle) {
+    let resizing = false, sx = 0, sy = 0, sw = 0, sh = 0;
+    handle.addEventListener('mousedown', e => {
+      const w = state.openWindows[win.dataset.winId];
+      if (w && w.maximized) return;
+      resizing = true;
+      sx = e.clientX; sy = e.clientY;
+      sw = win.offsetWidth; sh = win.offsetHeight;
+      e.preventDefault();
+      e.stopPropagation();
+    });
+    document.addEventListener('mousemove', e => {
+      if (!resizing) return;
+      const nw = Math.max(320, sw + (e.clientX - sx));
+      const nh = Math.max(220, sh + (e.clientY - sy));
+      win.style.width = nw + 'px';
+      win.style.height = nh + 'px';
+    });
+    document.addEventListener('mouseup', () => {
+      if (resizing) saveOSState();
+      resizing = false;
+    });
+  }
+};
+
+// ============================================================
+// DESKTOP ICONS
+// ============================================================
+function createDesktopIcon(app) {
+  const icon = document.createElement('div');
+  icon.className = 'desktop-icon';
+  const pos = DesktopGrid.defaultPos(app);
+  icon.style.cssText = `top:${pos.top}px;left:${pos.left}px`;
+  icon.dataset.appId = app.id;
+  icon.innerHTML = `<div class="icon-img">${app.icon}</div><div class="icon-label">${iconLabel(app)}</div>`;
+
+  let clickTimer = null;
+  icon.addEventListener('click', e => {
+    e.stopPropagation();
+    if (icon.classList.contains('renaming')) return;
+    selectIcon(icon, e.ctrlKey || e.shiftKey);
+
+    if (clickTimer) {
+      clearTimeout(clickTimer);
+      clickTimer = null;
+      openApp(app.id);
+    } else {
+      clickTimer = setTimeout(() => { clickTimer = null; }, 400);
+    }
+  });
+
+  icon.addEventListener('mousedown', e => {
+    if (e.button !== 0 || icon.classList.contains('renaming')) return;
+    selectIcon(icon, e.ctrlKey || e.shiftKey);
+    const iox = e.clientX - icon.offsetLeft;
+    const ioy = e.clientY - icon.offsetTop;
+    let moved = false;
+    const onMove = ev => {
+      moved = true;
+      const nx = Math.max(0, Math.min(window.innerWidth - 80, ev.clientX - iox));
+      const ny = Math.max(0, Math.min(window.innerHeight - 52 - 90, ev.clientY - ioy));
+      icon.style.left = nx + 'px';
+      icon.style.top = ny + 'px';
+    };
+    const onUp = () => {
+      if (moved) DesktopGrid.snapIcon(icon);
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+
+  return icon;
+}
+
+function renderDesktopIcons() {
+  DesktopGrid.configureForMode();
+  const desktop = document.getElementById('desktop');
+  desktop.querySelectorAll('.desktop-icon').forEach(icon => icon.remove());
+  APPS.filter(app => !isIconDeleted(app.id) && !isIconPermanentlyDeleted(app.id)).forEach(app => desktop.appendChild(createDesktopIcon(app)));
+  DesktopGrid.snapAll();
+}
+
+function setupDesktopSelection() {
+  const desktop = document.getElementById('desktop');
+  const box = document.getElementById('selection-box');
+  let selecting = false;
+  let didSelect = false;
+  let sx = 0, sy = 0;
+
+  desktop.addEventListener('mousedown', e => {
+    if (e.button !== 0 || e.target !== desktop) return;
+    selecting = true;
+    didSelect = false;
+    sx = e.clientX;
+    sy = e.clientY;
+    box.style.display = 'block';
+    box.style.left = sx + 'px';
+    box.style.top = sy + 'px';
+    box.style.width = '0px';
+    box.style.height = '0px';
+    clearIconSelection();
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!selecting) return;
+    const left = Math.min(sx, e.clientX);
+    const top = Math.min(sy, e.clientY);
+    const width = Math.abs(e.clientX - sx);
+    const height = Math.abs(e.clientY - sy);
+    didSelect = width > 4 || height > 4;
+    box.style.left = left + 'px';
+    box.style.top = top + 'px';
+    box.style.width = width + 'px';
+    box.style.height = height + 'px';
+    const bounds = box.getBoundingClientRect();
+    clearIconSelection();
+    document.querySelectorAll('.desktop-icon').forEach(icon => {
+      const rect = icon.getBoundingClientRect();
+      const hit = rect.left < bounds.right && rect.right > bounds.left && rect.top < bounds.bottom && rect.bottom > bounds.top;
+      if (hit) selectIcon(icon, true);
+    });
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!selecting) return;
+    selecting = false;
+    box.style.display = 'none';
+  });
+
+  desktop.addEventListener('click', e => {
+    if (e.target !== desktop) return;
+    if (!didSelect) clearIconSelection();
+    didSelect = false;
+    closeStartMenu();
+  });
+
+  document.addEventListener('mousedown', e => {
+    if (e.target.closest('.desktop-icon, #context-menu, .icon-rename-input')) return;
+    if (e.target === desktop) return;
+    clearIconSelection();
+  });
+}
+
+function setupDesktop() {
+  renderDesktopIcons();
+  setupDesktopSelection();
+}
+
+// ============================================================
+// APP LAUNCHER
+// ============================================================
+function openApp(appId, opts = {}) {
+  switch (appId) {
+    case 'files':    openFilesApp(opts); break;
+    case 'notes':    openNotesApp(opts); break;
+    case 'paint':    openPaintApp(opts); break;
+    case 'games':    openGamesApp(opts); break;
+    case 'settings': openSettingsApp(opts); break;
+    case 'recycle':  openRecycleApp(opts); break;
+    case 'snake':    openSnakeGame(opts); break;
+    case 'minesweeper': openMinesweeper(opts); break;
+  }
+}
+
+// ============================================================
+// FILES APP
+// ============================================================
+const FILES_DATA = {
+  root: [
+    { name: 'Documents', icon: '📄', type: 'folder', children: 'documents' },
+    { name: 'Pictures',  icon: '🖼️', type: 'folder', children: 'pictures' },
+    { name: 'Games',     icon: '🎮', type: 'folder', children: 'games' },
+  ],
+  documents: [
+    { name: 'Homework.txt',  icon: '📃', type: 'file' },
+    { name: 'Story.txt',     icon: '📃', type: 'file' },
+    { name: 'My Resume.doc', icon: '📑', type: 'file' },
+  ],
+  pictures: [
+    { name: 'Vacation.jpg',  icon: '🏖️', type: 'file' },
+    { name: 'Birthday.png',  icon: '🎂', type: 'file' },
+    { name: 'Family.jpg',    icon: '👨‍👩‍👧', type: 'file' },
+  ],
+  games: [
+    { name: 'Snake.exe',       icon: '🐍', type: 'file' },
+    { name: 'Minesweeper.exe', icon: '💣', type: 'file' },
+  ],
+};
+
+function openFilesApp(opts = {}) {
+  WindowManager.create('files', 'Files', '📁', (body) => {
+    body.innerHTML = `<div class="files-app">
+      <div class="files-nav">
+        <button class="files-back-btn" id="files-back" disabled>← Back</button>
+        <span class="files-path" id="files-path">📁 This PC</span>
+      </div>
+      <div class="files-grid" id="files-grid"></div>
+    </div>`;
+    renderFilesView(body, 'root');
+  }, Object.assign({ width: 520, height: 380 }, opts));
+}
+
+function renderFilesView(body, folder) {
+  const grid = body.querySelector('#files-grid');
+  const path = body.querySelector('#files-path');
+  const backBtn = body.querySelector('#files-back');
+  const items = FILES_DATA[folder] || [];
+  const isRoot = folder === 'root';
+
+  path.textContent = isRoot ? '📁 This PC' : '📁 ' + folder.charAt(0).toUpperCase() + folder.slice(1);
+  backBtn.disabled = isRoot;
+
+  backBtn.onclick = () => renderFilesView(body, 'root');
+
+  grid.innerHTML = '';
+  items.forEach(item => {
+    const el = document.createElement('div');
+    el.className = 'file-item';
+    el.innerHTML = `<div class="f-icon">${item.icon}</div><div class="f-name">${item.name}</div>`;
+    if (item.type === 'folder') {
+      el.addEventListener('dblclick', () => renderFilesView(body, item.children));
+      el.addEventListener('click', e => { if (e.detail === 2) return; });
+    }
+    grid.appendChild(el);
+  });
+}
+
+// ============================================================
+// NOTES APP
+// ============================================================
+function openNotesApp(opts = {}) {
+  WindowManager.create('notes', 'Notes', '📝', (body) => {
+    body.style.display = 'flex';
+    body.style.flexDirection = 'column';
+    body.style.height = '100%';
+    body.innerHTML = `
+      <div class="notes-app">
+        <div class="notes-toolbar">
+          <button class="notes-save-btn" id="notes-save">💾 Save</button>
+          <span class="notes-status" id="notes-status"></span>
+        </div>
+        <textarea class="notes-textarea" id="notes-ta" placeholder="Start typing your notes here..."></textarea>
+      </div>`;
+    body.style.overflow = 'hidden';
+
+    const noteApp = body.querySelector('.notes-app');
+    noteApp.style.cssText = 'display:flex;flex-direction:column;height:100%;';
+
+    const ta = body.querySelector('#notes-ta');
+    ta.value = state.notes;
+    const status = body.querySelector('#notes-status');
+
+    body.querySelector('#notes-save').addEventListener('click', () => {
+      state.notes = ta.value;
+      localStorage.setItem('kidos_notes', state.notes);
+      saveOSState();
+      status.textContent = '✅ Saved!';
+      setTimeout(() => status.textContent = '', 2000);
+    });
+  }, Object.assign({ width: 500, height: 400 }, opts));
+}
+
+// ============================================================
+// PAINT APP
+// ============================================================
+function openPaintApp(opts = {}) {
+  WindowManager.create('paint', 'Paint', '🎨', (body) => {
+    body.innerHTML = `
+      <div class="paint-app">
+        <div class="paint-toolbar">
+          <label>Color:</label>
+          <input type="color" class="paint-color-picker" id="paint-color" value="#000000">
+          <label>Size:</label>
+          <input type="range" class="paint-size-slider" id="paint-size" min="2" max="40" value="8">
+          <button class="paint-clear-btn" id="paint-clear">🗑️ Clear</button>
+        </div>
+        <div class="paint-canvas-wrap">
+          <canvas class="paint-canvas" id="paint-canvas"></canvas>
+        </div>
+      </div>`;
+    body.style.overflow = 'hidden';
+
+    const paintApp = body.querySelector('.paint-app');
+    paintApp.style.cssText = 'display:flex;flex-direction:column;height:100%;';
+
+    const canvasWrap = body.querySelector('.paint-canvas-wrap');
+    const canvas = body.querySelector('#paint-canvas');
+
+    // Size canvas to fill wrap
+    function resizeCanvas() {
+      const w = canvasWrap.offsetWidth;
+      const h = canvasWrap.offsetHeight;
+      const imgData = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, w, h);
+      ctx.putImageData(imgData, 0, 0);
+    }
+    setTimeout(resizeCanvas, 50);
+
+    const ctx = canvas.getContext('2d');
+    let painting = false;
+    let lastX = 0, lastY = 0;
+
+    function getPos(e) {
+      const rect = canvas.getBoundingClientRect();
+      if (e.touches) {
+        return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+      }
+      return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    }
+
+    function startDraw(e) {
+      painting = true;
+      const pos = getPos(e);
+      lastX = pos.x; lastY = pos.y;
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, ctx.lineWidth / 2, 0, Math.PI * 2);
+      ctx.fillStyle = document.getElementById('paint-color').value;
+      ctx.fill();
+    }
+
+    function draw(e) {
+      if (!painting) return;
+      e.preventDefault();
+      const pos = getPos(e);
+      ctx.lineWidth = document.getElementById('paint-size').value;
+      ctx.strokeStyle = document.getElementById('paint-color').value;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
+      lastX = pos.x; lastY = pos.y;
+    }
+
+    function stopDraw() { painting = false; }
+
+    canvas.addEventListener('mousedown', startDraw);
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('mouseup', stopDraw);
+    canvas.addEventListener('mouseleave', stopDraw);
+    canvas.addEventListener('touchstart', startDraw, { passive: false });
+    canvas.addEventListener('touchmove', draw, { passive: false });
+    canvas.addEventListener('touchend', stopDraw);
+
+    body.querySelector('#paint-clear').addEventListener('click', () => {
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    });
+
+    // White background
+    setTimeout(() => {
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }, 60);
+
+  }, Object.assign({ width: 600, height: 460 }, opts));
+}
+
+// ============================================================
+// GAMES LAUNCHER
+// ============================================================
+function openGamesApp(opts = {}) {
+  WindowManager.create('games', 'Games', '🎮', (body) => {
+    body.innerHTML = `
+      <div class="games-app">
+        <h2>🎮 Game Library</h2>
+        <div class="game-launch-item" id="launch-snake">
+          <div class="g-icon">🐍</div>
+          <div class="g-info">
+            <h3>Snake</h3>
+            <p>Classic snake game. Eat food, grow longer!</p>
+          </div>
+        </div>
+        <div class="game-launch-item" id="launch-mines">
+          <div class="g-icon">💣</div>
+          <div class="g-info">
+            <h3>Minesweeper</h3>
+            <p>Find all the mines without blowing up!</p>
+          </div>
+        </div>
+      </div>`;
+    body.querySelector('#launch-snake').addEventListener('click', () => openSnakeGame());
+    body.querySelector('#launch-mines').addEventListener('click', () => openMinesweeper());
+  }, Object.assign({ width: 380, height: 300 }, opts));
+}
+
+// ============================================================
+// SNAKE GAME
+// ============================================================
+function openSnakeGame(opts = {}) {
+  WindowManager.create('snake', 'Snake', '🐍', (body, winId) => {
+    const CELL = 20, COLS = 18, ROWS = 16;
+    const W = COLS * CELL, H = ROWS * CELL;
+
+    body.innerHTML = `
+      <div class="snake-app">
+        <div class="snake-score">Score: <span id="snake-score-${winId}">0</span></div>
+        <canvas id="snake-canvas-${winId}" width="${W}" height="${H}"></canvas>
+        <div class="snake-msg" id="snake-msg-${winId}">Use Arrow Keys to play!</div>
+        <button class="snake-restart-btn" id="snake-restart-${winId}">▶ Start</button>
+      </div>`;
+
+    const canvas = document.getElementById('snake-canvas-' + winId);
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('snake-score-' + winId);
+    const msgEl = document.getElementById('snake-msg-' + winId);
+    const restartBtn = document.getElementById('snake-restart-' + winId);
+
+    let snake, dir, nextDir, food, score, gameLoop, running = false;
+    let lastControllerDir = null;
+
+    function rand(max) { return Math.floor(Math.random() * max); }
+
+    function placeFood() {
+      let f;
+      do { f = { x: rand(COLS), y: rand(ROWS) }; }
+      while (snake.some(s => s.x === f.x && s.y === f.y));
+      return f;
+    }
+
+    function initGame() {
+      snake = [{ x: 9, y: 8 }, { x: 8, y: 8 }, { x: 7, y: 8 }];
+      dir = { x: 1, y: 0 };
+      nextDir = { x: 1, y: 0 };
+      score = 0;
+      scoreEl.textContent = 0;
+      food = placeFood();
+      msgEl.textContent = '';
+      running = true;
+      if (gameLoop) clearInterval(gameLoop);
+      gameLoop = setInterval(tick, 140);
+    }
+
+    function setDirection(d) {
+      if (!d || !dir) return;
+      if (d.x !== -dir.x || d.y !== -dir.y) nextDir = d;
+    }
+
+    function tick() {
+      dir = nextDir;
+      const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+
+      // Wall collision
+      if (head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS) return endGame();
+      // Self collision
+      if (snake.some(s => s.x === head.x && s.y === head.y)) return endGame();
+
+      snake.unshift(head);
+      if (head.x === food.x && head.y === food.y) {
+        score++;
+        scoreEl.textContent = score;
+        food = placeFood();
+      } else {
+        snake.pop();
+      }
+      draw();
+    }
+
+    function draw() {
+      ctx.fillStyle = '#0d0d1a';
+      ctx.fillRect(0, 0, W, H);
+
+      // Grid
+      ctx.strokeStyle = 'rgba(0,255,136,0.05)';
+      ctx.lineWidth = 0.5;
+      for (let x = 0; x <= COLS; x++) { ctx.beginPath(); ctx.moveTo(x*CELL,0); ctx.lineTo(x*CELL,H); ctx.stroke(); }
+      for (let y = 0; y <= ROWS; y++) { ctx.beginPath(); ctx.moveTo(0,y*CELL); ctx.lineTo(W,y*CELL); ctx.stroke(); }
+
+      // Food
+      ctx.fillStyle = '#ff4455';
+      ctx.shadowColor = '#ff4455';
+      ctx.shadowBlur = 10;
+      ctx.beginPath();
+      ctx.arc(food.x*CELL+CELL/2, food.y*CELL+CELL/2, CELL/2-2, 0, Math.PI*2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      // Snake
+      snake.forEach((s, i) => {
+        const ratio = 1 - i / snake.length;
+        ctx.fillStyle = `hsl(150,100%,${30+ratio*30}%)`;
+        ctx.shadowColor = i === 0 ? '#00ff88' : 'transparent';
+        ctx.shadowBlur = i === 0 ? 8 : 0;
+        const pad = i === 0 ? 1 : 2;
+        ctx.beginPath();
+        ctx.roundRect(s.x*CELL+pad, s.y*CELL+pad, CELL-pad*2, CELL-pad*2, 4);
+        ctx.fill();
+      });
+      ctx.shadowBlur = 0;
+    }
+
+    function endGame() {
+      running = false;
+      clearInterval(gameLoop);
+      msgEl.textContent = `💀 Game Over! Score: ${score}`;
+      restartBtn.textContent = '🔄 Restart';
+      draw();
+      // Show "GAME OVER" overlay
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#ff4455';
+      ctx.font = 'bold 28px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('GAME OVER', W/2, H/2);
+    }
+
+    restartBtn.addEventListener('click', initGame);
+
+    // Key controls — only when this window is focused
+    const keyHandler = e => {
+      const w = state.openWindows[winId];
+      if (!w || !w.el.classList.contains('focused')) return;
+      const map = { ArrowUp:{x:0,y:-1}, ArrowDown:{x:0,y:1}, ArrowLeft:{x:-1,y:0}, ArrowRight:{x:1,y:0} };
+      const d = map[e.key];
+      if (!d) return;
+      // Prevent reversing
+      setDirection(d);
+      e.preventDefault();
+    };
+    document.addEventListener('keydown', keyHandler);
+
+    const removeController = ControllerInput.registerSnake((pad, ax, ay) => {
+      const w = state.openWindows[winId];
+      if (!w || !w.el.classList.contains('focused')) return;
+
+      if (pad.buttons[0] && pad.buttons[0].pressed && !ControllerInput.prevButtons[0] && !running) {
+        initGame();
+      }
+
+      let stickDir = null;
+      const dpx = (pad.buttons[15] && pad.buttons[15].pressed ? 1 : 0) - (pad.buttons[14] && pad.buttons[14].pressed ? 1 : 0);
+      const dpy = (pad.buttons[13] && pad.buttons[13].pressed ? 1 : 0) - (pad.buttons[12] && pad.buttons[12].pressed ? 1 : 0);
+      if (dpx) {
+        stickDir = { x: dpx, y: 0 };
+      } else if (dpy) {
+        stickDir = { x: 0, y: dpy };
+      } else if (Math.abs(ax) > Math.abs(ay) && Math.abs(ax) > 0) {
+        stickDir = ax > 0 ? { x: 1, y: 0 } : { x: -1, y: 0 };
+      } else if (Math.abs(ay) > 0) {
+        stickDir = ay > 0 ? { x: 0, y: 1 } : { x: 0, y: -1 };
+      }
+
+      if (!stickDir) {
+        lastControllerDir = null;
+        return;
+      }
+      const key = stickDir.x + ',' + stickDir.y;
+      if (key !== lastControllerDir) {
+        setDirection(stickDir);
+        lastControllerDir = key;
+      }
+    });
+
+    // Cleanup on close
+    const origClose = WindowManager.close.bind(WindowManager);
+    const closeObs = new MutationObserver(() => {
+      if (!document.body.contains(canvas)) {
+        clearInterval(gameLoop);
+        document.removeEventListener('keydown', keyHandler);
+        removeController();
+        closeObs.disconnect();
+      }
+    });
+    closeObs.observe(document.body, { childList: true, subtree: true });
+
+    // Initial draw
+    ctx.fillStyle = '#0d0d1a';
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#00ff88';
+    ctx.font = 'bold 18px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('Press Start!', W/2, H/2);
+
+  }, Object.assign({ width: 410, height: 420, allowMultiple: false }, opts));
+}
+
+// ============================================================
+// MINESWEEPER
+// ============================================================
+function openMinesweeper(opts = {}) {
+  const ROWS = 8, COLS = 8, MINES = 10;
+
+  WindowManager.create('minesweeper', 'Minesweeper', '💣', (body, winId) => {
+    body.innerHTML = `
+      <div class="mines-app">
+        <div class="mines-header">
+          <div class="mines-stat">💣 <span id="mines-left-${winId}">10</span></div>
+          <button class="mines-restart-btn" id="mines-restart-${winId}">🙂 New Game</button>
+          <div class="mines-stat">⏱️ <span id="mines-time-${winId}">0</span>s</div>
+        </div>
+        <div id="mines-grid-${winId}" style="display:grid;grid-template-columns:repeat(${COLS},36px);gap:2px;background:rgba(255,255,255,0.05);padding:8px;border-radius:10px;"></div>
+        <div class="mines-msg" id="mines-msg-${winId}"></div>
+      </div>`;
+
+    let grid, revealed, flagged, mineSet, gameOver, won, timer, timeCount;
+    const gridEl = document.getElementById('mines-grid-' + winId);
+    const minesLeftEl = document.getElementById('mines-left-' + winId);
+    const timeEl = document.getElementById('mines-time-' + winId);
+    const msgEl = document.getElementById('mines-msg-' + winId);
+    const restartBtn = document.getElementById('mines-restart-' + winId);
+
+    function initGame() {
+      grid = Array.from({length: ROWS}, () => Array(COLS).fill(0));
+      revealed = Array.from({length: ROWS}, () => Array(COLS).fill(false));
+      flagged = Array.from({length: ROWS}, () => Array(COLS).fill(false));
+      mineSet = new Set();
+      gameOver = false; won = false; timeCount = 0;
+      msgEl.textContent = '';
+      minesLeftEl.textContent = MINES;
+      timeEl.textContent = 0;
+      if (timer) clearInterval(timer);
+      timer = setInterval(() => { if (!gameOver && !won) timeEl.textContent = ++timeCount; }, 1000);
+
+      // Place mines
+      while (mineSet.size < MINES) {
+        mineSet.add(Math.floor(Math.random() * ROWS * COLS));
+      }
+      // Calculate numbers
+      mineSet.forEach(idx => {
+        const r = Math.floor(idx / COLS), c = idx % COLS;
+        grid[r][c] = -1;
+      });
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          if (grid[r][c] === -1) continue;
+          let count = 0;
+          for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+            const nr = r+dr, nc = c+dc;
+            if (nr>=0&&nr<ROWS&&nc>=0&&nc<COLS&&grid[nr][nc]===-1) count++;
+          }
+          grid[r][c] = count;
+        }
+      }
+      renderGrid();
+    }
+
+    const NUM_COLORS = ['','#2196f3','#4caf50','#f44336','#9c27b0','#ff5722','#00bcd4','#212121','#9e9e9e'];
+
+    function renderGrid() {
+      gridEl.innerHTML = '';
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const cell = document.createElement('div');
+          cell.className = 'mine-cell';
+          if (revealed[r][c]) {
+            cell.classList.add('revealed');
+            if (grid[r][c] === -1) {
+              cell.classList.add('mine-hit');
+              cell.textContent = '💣';
+            } else if (grid[r][c] > 0) {
+              cell.textContent = grid[r][c];
+              cell.style.color = NUM_COLORS[grid[r][c]];
+            }
+          } else if (flagged[r][c]) {
+            cell.classList.add('flagged');
+            cell.textContent = '🚩';
+          }
+
+          cell.addEventListener('click', () => handleClick(r, c));
+          cell.addEventListener('contextmenu', e => { e.preventDefault(); handleFlag(r, c); });
+          gridEl.appendChild(cell);
+        }
+      }
+    }
+
+    function handleClick(r, c) {
+      if (gameOver || won || revealed[r][c] || flagged[r][c]) return;
+      if (grid[r][c] === -1) {
+        // Reveal all mines
+        for (let i = 0; i < ROWS; i++) for (let j = 0; j < COLS; j++) {
+          if (grid[i][j] === -1) revealed[i][j] = true;
+        }
+        gameOver = true;
+        clearInterval(timer);
+        msgEl.textContent = '💥 BOOM! You hit a mine!';
+        renderGrid();
+        return;
+      }
+      floodReveal(r, c);
+      checkWin();
+      renderGrid();
+    }
+
+    function floodReveal(r, c) {
+      if (r<0||r>=ROWS||c<0||c>=COLS||revealed[r][c]||flagged[r][c]) return;
+      revealed[r][c] = true;
+      if (grid[r][c] === 0) {
+        for (let dr=-1;dr<=1;dr++) for (let dc=-1;dc<=1;dc++) floodReveal(r+dr,c+dc);
+      }
+    }
+
+    function handleFlag(r, c) {
+      if (gameOver || won || revealed[r][c]) return;
+      flagged[r][c] = !flagged[r][c];
+      const flags = flagged.flat().filter(Boolean).length;
+      minesLeftEl.textContent = MINES - flags;
+      renderGrid();
+    }
+
+    function checkWin() {
+      let unrevealedSafe = 0;
+      for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) {
+        if (!revealed[r][c] && grid[r][c] !== -1) unrevealedSafe++;
+      }
+      if (unrevealedSafe === 0) {
+        won = true;
+        clearInterval(timer);
+        msgEl.textContent = `🎉 You won in ${timeCount}s!`;
+      }
+    }
+
+    restartBtn.addEventListener('click', initGame);
+
+    // Cleanup timer on close
+    const obs = new MutationObserver(() => {
+      if (!document.body.contains(gridEl)) { clearInterval(timer); obs.disconnect(); }
+    });
+    obs.observe(document.body, { childList: true, subtree: true });
+
+    initGame();
+  }, Object.assign({ width: 360, height: 440 }, opts));
+}
+
+// ============================================================
+// SETTINGS APP
+// ============================================================
+function openSettingsApp(opts = {}) {
+  WindowManager.create('settings', 'Settings', '⚙️', (body) => {
+    body.innerHTML = `
+      <div class="settings-app">
+        <h2>⚙️ Settings</h2>
+        <div class="setting-item">
+          <div class="setting-info">
+            <h3>Taskbar Style</h3>
+            <p>Choose where app icons appear in the taskbar</p>
+          </div>
+          <div class="toggle-group">
+            <button class="toggle-opt taskbar-toggle ${state.settings.taskbarStyle==='left' ? 'active':''}" data-val="left">⬅ Win 10</button>
+            <button class="toggle-opt taskbar-toggle ${state.settings.taskbarStyle==='centered' ? 'active':''}" data-val="centered">⬛ Win 11</button>
+          </div>
+        </div>
+        <div class="setting-item">
+          <div class="setting-info">
+            <h3>Wallpaper</h3>
+            <p>Choose a desktop background</p>
+          </div>
+          <div class="wallpaper-grid">
+            ${WALLPAPERS.map(w => `<button class="wallpaper-thumb ${state.settings.wallpaper===w.id ? 'active':''}" data-wallpaper="${w.id}" style="background:${w.css}" title="${w.id}"></button>`).join('')}
+          </div>
+        </div>
+        <div class="setting-item">
+          <div class="setting-info">
+            <h3>Theme</h3>
+            <p>Switch between light and dark mode</p>
+          </div>
+          <div class="toggle-group">
+            <button class="toggle-opt theme-toggle ${state.settings.theme!=='dark' ? 'active':''}" data-theme="light">Light</button>
+            <button class="toggle-opt theme-toggle ${state.settings.theme==='dark' ? 'active':''}" data-theme="dark">Dark</button>
+          </div>
+        </div>
+        <div class="setting-item">
+          <div class="setting-info">
+            <h3>Xbox / TV Mode</h3>
+            <p>Larger icons, stronger focus, and controller hints for Microsoft Edge on Xbox</p>
+          </div>
+          <div class="toggle-group">
+            <button class="toggle-opt xbox-toggle ${!state.settings.xboxMode ? 'active':''}" data-xbox="off">Off</button>
+            <button class="toggle-opt xbox-toggle ${state.settings.xboxMode ? 'active':''}" data-xbox="on">On</button>
+          </div>
+        </div>
+      </div>`;
+
+    body.querySelectorAll('.taskbar-toggle').forEach(btn => {
+      btn.addEventListener('click', () => {
+        body.querySelectorAll('.taskbar-toggle').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const val = btn.dataset.val;
+        state.settings.taskbarStyle = val;
+        saveSettings();
+        applyTaskbarStyle();
+      });
+    });
+
+    body.querySelectorAll('.wallpaper-thumb').forEach(btn => {
+      btn.addEventListener('click', () => {
+        body.querySelectorAll('.wallpaper-thumb').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.settings.wallpaper = btn.dataset.wallpaper;
+        saveSettings();
+        applyAppearance();
+      });
+    });
+
+    body.querySelectorAll('.theme-toggle').forEach(btn => {
+      btn.addEventListener('click', () => {
+        body.querySelectorAll('.theme-toggle').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.settings.theme = btn.dataset.theme;
+        saveSettings();
+        applyAppearance();
+      });
+    });
+
+    body.querySelectorAll('.xbox-toggle').forEach(btn => {
+      btn.addEventListener('click', () => {
+        body.querySelectorAll('.xbox-toggle').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.settings.xboxMode = btn.dataset.xbox === 'on';
+        saveSettings();
+        applyAppearance();
+        renderDesktopIcons();
+      });
+    });
+  }, Object.assign({ width: 560, height: 500 }, opts));
+}
+
+// ============================================================
+// RECYCLE BIN
+// ============================================================
+function openRecycleApp(opts = {}) {
+  const rows = state.deletedIcons.map(item => `
+    <div class="recycle-row" data-app-id="${item.id}">
+      <div class="recycle-name">${item.icon} ${escapeHTML(item.label)}</div>
+      <div class="recycle-actions">
+        <button data-action="restore">Restore</button>
+        <button class="danger" data-action="delete">Delete Permanently</button>
+      </div>
+    </div>`).join('');
+  WindowManager.create('recycle', 'Recycle Bin', '🗑️', (body) => {
+    body.innerHTML = `
+      <div class="recycle-app">
+        <div class="rb-icon">🗑️</div>
+        <h2>${state.deletedIcons.length ? 'Recycle Bin' : 'Recycle Bin is Empty'}</h2>
+        <p>${state.deletedIcons.length ? 'Restore items or delete them permanently.' : 'Deleted items will appear here.<br>Nothing has been deleted yet!'}</p>
+        <div class="recycle-list">${rows}</div>
+      </div>`;
+
+    body.querySelectorAll('.recycle-row button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const appId = btn.closest('.recycle-row').dataset.appId;
+        if (btn.dataset.action === 'restore') restoreIcon(appId);
+        if (btn.dataset.action === 'delete') deleteIconPermanently(appId);
+      });
+    });
+  }, Object.assign({ width: 440, height: 360 }, opts));
+}
+
+// ============================================================
+// TASKBAR STYLE
+// ============================================================
+function applyTaskbarStyle() {
+  const tb = document.getElementById('taskbar');
+  tb.classList.remove('style-left', 'style-centered');
+  tb.classList.add('style-' + (state.settings.taskbarStyle || 'left'));
+}
+
+// ============================================================
+// START MENU
+// ============================================================
+function setupStartMenu() {
+  const menu = document.getElementById('start-menu');
+  APPS.forEach(app => {
+    const item = document.createElement('div');
+    item.className = 'start-app-item';
+    item.innerHTML = `<span class="s-icon">${app.icon}</span><span>${app.label}</span>`;
+    item.addEventListener('click', () => {
+      openApp(app.id);
+      closeStartMenu();
+    });
+    menu.appendChild(item);
+  });
+
+  document.getElementById('start-btn').addEventListener('click', e => {
+    e.stopPropagation();
+    menu.classList.toggle('open');
+  });
+}
+
+function closeStartMenu() {
+  document.getElementById('start-menu').classList.remove('open');
+  if (ControllerInput.focusedEl && ControllerInput.focusedEl.closest('#start-menu')) {
+    ControllerInput.setFocus(null);
+  }
+}
+
+// ============================================================
+// CLOCK
+// ============================================================
+function startClock() {
+  const clockEl = document.getElementById('clock');
+  function update() {
+    const now = new Date();
+    const h = now.getHours().toString().padStart(2, '0');
+    const m = now.getMinutes().toString().padStart(2, '0');
+    const d = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    clockEl.innerHTML = `${h}:${m}<br><small style="font-size:10px;opacity:0.7">${d}</small>`;
+  }
+  update();
+  setInterval(update, 10000);
+}
+
+function restoreOpenWindows() {
+  const windows = state.savedOpenWindows || [];
+  state.savedOpenWindows = [];
+  windows.forEach(w => {
+    if (!getApp(w.appId)) return;
+    openApp(w.appId, {
+      x: w.left,
+      y: w.top,
+      width: w.width,
+      height: w.height,
+      restoring: true,
+    });
+  });
+  saveOSState();
+}
+
+// ============================================================
+// INIT
+// ============================================================
+function init() {
+  applyAppearance();
+  applyTaskbarStyle();
+  setupDesktop();
+  setupStartMenu();
+  ContextMenu.init();
+  ControllerInput.init();
+  restoreOpenWindows();
+  startClock();
+}
+
+init();
+</script>
+</body>
+</html>
