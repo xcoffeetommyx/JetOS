@@ -742,6 +742,131 @@
   body.theme-dark .notes-textarea { background: #1b1c24; color: #f5f6fa; }
 
 
+  /* ===== KID BROWSER ===== */
+  .browser-app {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: #f5f6fa;
+    color: #222;
+  }
+  .browser-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: #fff;
+    border-bottom: 1px solid #e0e0e0;
+    flex-shrink: 0;
+  }
+  .browser-back-btn,
+  .browser-home-btn,
+  .browser-external-btn {
+    min-height: 36px;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 8px;
+    background: #0078d7;
+    color: #fff;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 700;
+    transition: filter 0.12s ease-out, background 0.12s ease-out;
+  }
+  .browser-back-btn:hover,
+  .browser-home-btn:hover,
+  .browser-external-btn:hover { filter: brightness(1.12); }
+  .browser-back-btn:disabled { background: #b6bcc8; cursor: default; filter: none; }
+  .browser-title {
+    flex: 1;
+    min-width: 0;
+    font-size: 13px;
+    font-weight: 700;
+    color: #555;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .browser-home {
+    padding: 20px;
+    overflow: auto;
+  }
+  .browser-home h2 {
+    font-size: 20px;
+    color: #222;
+    margin-bottom: 8px;
+    font-weight: 800;
+  }
+  .browser-home p {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 16px;
+    line-height: 1.5;
+  }
+  .browser-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+  }
+  .browser-site-tile {
+    min-height: 96px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 6px;
+    padding: 16px;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    background: #fff;
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.12s ease-out, transform 0.12s ease-out, background 0.12s ease-out;
+  }
+  .browser-site-tile:hover {
+    border-color: #0078d7;
+    transform: translateY(-1px);
+  }
+  .browser-site-icon { font-size: 28px; line-height: 1; }
+  .browser-site-name { font-size: 15px; font-weight: 800; color: #222; }
+  .browser-site-url { font-size: 11px; color: #777; word-break: break-word; }
+  .browser-frame-wrap {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    background: #fff;
+  }
+  .browser-frame {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: #fff;
+  }
+  .browser-message {
+    padding: 24px;
+    line-height: 1.5;
+  }
+  .browser-message h2 { font-size: 20px; color: #222; margin-bottom: 8px; }
+  .browser-message p { font-size: 14px; color: #666; margin-bottom: 12px; }
+  body.theme-dark .browser-app,
+  body.theme-dark .browser-home,
+  body.theme-dark .browser-frame-wrap { background: #20212b; color: #f5f6fa; }
+  body.theme-dark .browser-toolbar,
+  body.theme-dark .browser-site-tile { background: #2b2d38; border-color: #3c4050; }
+  body.theme-dark .browser-home h2,
+  body.theme-dark .browser-message h2,
+  body.theme-dark .browser-site-name { color: #f5f6fa; }
+  body.theme-dark .browser-home p,
+  body.theme-dark .browser-message p,
+  body.theme-dark .browser-title,
+  body.theme-dark .browser-site-url { color: #b8bdc8; }
+  body.xbox-mode .browser-site-tile { min-height: 120px; padding: 20px; }
+  body.xbox-mode .browser-site-name { font-size: 17px; }
+  body.xbox-mode .browser-back-btn,
+  body.xbox-mode .browser-home-btn,
+  body.xbox-mode .browser-external-btn { min-height: 44px; font-size: 15px; }
+
+
   /* ===== XBOX / TV MODE ===== */
   #xbox-hint {
     position: fixed;
@@ -873,6 +998,7 @@ function readStoredState() {
     permanentDeleted: [],
     openWindows: [],
     notes: localStorage.getItem('kidos_notes') || '',
+    allowedSites: null,
   };
   return Object.assign(base, stored, {
     settings: Object.assign(base.settings, legacySettings, stored.settings || {}),
@@ -882,6 +1008,7 @@ function readStoredState() {
     permanentDeleted: stored.permanentDeleted || [],
     openWindows: stored.openWindows || [],
     notes: stored.notes !== undefined ? stored.notes : base.notes,
+    allowedSites: stored.allowedSites || base.allowedSites,
   });
 }
 
@@ -894,6 +1021,7 @@ const state = {
   permanentDeleted: osState.permanentDeleted,
   savedOpenWindows: osState.openWindows,
   notes: osState.notes,
+  allowedSites: osState.allowedSites,
   openWindows: {},
   zTop: 100,
   selectedIcon: null,
@@ -916,6 +1044,7 @@ function saveOSState() {
       height: w.el.offsetHeight,
     }));
   osState.notes = state.notes;
+  osState.allowedSites = state.allowedSites;
   localStorage.setItem('osState', JSON.stringify(osState));
 }
 
@@ -927,8 +1056,9 @@ const APPS = [
   { id: 'notes',      label: 'Notes',        icon: '📝', desktopPos: { top: 120, left: 20 } },
   { id: 'paint',      label: 'Paint',        icon: '🎨', desktopPos: { top: 220, left: 20 } },
   { id: 'games',      label: 'Games',        icon: '🎮', desktopPos: { top: 320, left: 20 } },
-  { id: 'settings',   label: 'Settings',     icon: '⚙️', desktopPos: { top: 420, left: 20 } },
-  { id: 'recycle',    label: 'Recycle Bin',  icon: '🗑️', desktopPos: { top: 520, left: 20 } },
+  { id: 'browser',    label: 'Kid Browser',  icon: '🌐', desktopPos: { top: 420, left: 20 } },
+  { id: 'settings',   label: 'Settings',     icon: '⚙️', desktopPos: { top: 520, left: 20 } },
+  { id: 'recycle',    label: 'Recycle Bin',  icon: '🗑️', desktopPos: { top: 620, left: 20 } },
 ];
 
 const WALLPAPERS = [
@@ -938,6 +1068,31 @@ const WALLPAPERS = [
   { id: 'graphite', css: 'linear-gradient(135deg, #202632 0%, #596475 50%, #aeb6c2 100%)' },
   { id: 'berry', css: 'linear-gradient(135deg, #4b134f 0%, #8e3f65 45%, #f2a6a6 100%)' },
 ];
+
+const DEFAULT_ALLOWED_SITES = [
+  { id: 'pbskids', name: 'PBS Kids', icon: '🧩', url: 'https://pbskids.org', host: 'pbskids.org', embed: true },
+  { id: 'starfall', name: 'Starfall', icon: '⭐', url: 'https://www.starfall.com', host: 'starfall.com', embed: true },
+  { id: 'abcya', name: 'ABCya', icon: '🔤', url: 'https://www.abcya.com', host: 'abcya.com', embed: true },
+  { id: 'coolmath', name: 'Coolmath Games', icon: '➗', url: 'https://www.coolmathgames.com', host: 'coolmathgames.com', embed: true },
+  { id: 'ytkids', name: 'YouTube Kids', icon: '📺', url: 'https://www.youtubekids.com', host: 'youtubekids.com', embed: false },
+  { id: 'youtube', name: 'YouTube', icon: '▶️', url: 'https://www.youtube.com', host: 'youtube.com', embed: false },
+];
+
+function allowedSites() {
+  if (!Array.isArray(state.allowedSites) || !state.allowedSites.length) {
+    state.allowedSites = DEFAULT_ALLOWED_SITES.map(site => Object.assign({}, site));
+  }
+  return state.allowedSites;
+}
+
+function isAllowedSite(url) {
+  try {
+    const parsed = new URL(url);
+    return allowedSites().some(site => parsed.hostname === site.host || parsed.hostname.endsWith('.' + site.host));
+  } catch (_) {
+    return false;
+  }
+}
 
 function saveSettings() {
   saveOSState();
@@ -1386,7 +1541,7 @@ const ControllerInput = {
   },
 
   focusables() {
-    const base = Array.from(document.querySelectorAll('.desktop-icon, .taskbar-item'));
+    const base = Array.from(document.querySelectorAll('.desktop-icon, .taskbar-item, .browser-site-tile, .browser-back-btn, .browser-home-btn, .browser-external-btn'));
     const start = document.getElementById('start-menu');
     if (start && start.classList.contains('open')) {
       base.push(...start.querySelectorAll('.start-app-item'));
@@ -1874,6 +2029,7 @@ function openApp(appId, opts = {}) {
     case 'notes':    openNotesApp(opts); break;
     case 'paint':    openPaintApp(opts); break;
     case 'games':    openGamesApp(opts); break;
+    case 'browser':  openBrowserApp(opts); break;
     case 'settings': openSettingsApp(opts); break;
     case 'recycle':  openRecycleApp(opts); break;
     case 'snake':    openSnakeGame(opts); break;
@@ -1889,6 +2045,7 @@ const FILES_DATA = {
     { name: 'Documents', icon: '📄', type: 'folder', children: 'documents' },
     { name: 'Pictures',  icon: '🖼️', type: 'folder', children: 'pictures' },
     { name: 'Games',     icon: '🎮', type: 'folder', children: 'games' },
+    { name: 'Internet',  icon: '🌐', type: 'file' },
   ],
   documents: [
     { name: 'Homework.txt',  icon: '📃', type: 'file' },
@@ -1939,6 +2096,8 @@ function renderFilesView(body, folder) {
     if (item.type === 'folder') {
       el.addEventListener('dblclick', () => renderFilesView(body, item.children));
       el.addEventListener('click', e => { if (e.detail === 2) return; });
+    } else if (item.name === 'Internet') {
+      el.addEventListener('dblclick', () => openApp('browser'));
     }
     grid.appendChild(el);
   });
@@ -2078,6 +2237,103 @@ function openPaintApp(opts = {}) {
     }, 60);
 
   }, Object.assign({ width: 600, height: 460 }, opts));
+}
+
+// ============================================================
+// KID BROWSER APP
+// ============================================================
+function openBrowserApp(opts = {}) {
+  WindowManager.create('browser', 'Kid Browser', '🌐', (body) => {
+    body.style.overflow = 'hidden';
+    body.innerHTML = `
+      <div class="browser-app">
+        <div class="browser-toolbar">
+          <button class="browser-back-btn" id="browser-back" disabled>← Back</button>
+          <button class="browser-home-btn" id="browser-home">Home</button>
+          <span class="browser-title" id="browser-title">Safe sites only</span>
+        </div>
+        <div class="browser-home" id="browser-home-view">
+          <h2>🌐 Kid Browser</h2>
+          <p>Choose an approved site. This browser only allows the sites on the safe list.</p>
+          <div class="browser-grid" id="browser-grid"></div>
+        </div>
+        <div class="browser-frame-wrap" id="browser-view" style="display:none"></div>
+      </div>`;
+
+    const homeView = body.querySelector('#browser-home-view');
+    const browserView = body.querySelector('#browser-view');
+    const titleEl = body.querySelector('#browser-title');
+    const backBtn = body.querySelector('#browser-back');
+    const homeBtn = body.querySelector('#browser-home');
+    const grid = body.querySelector('#browser-grid');
+    let currentSite = null;
+
+    function showHome() {
+      currentSite = null;
+      browserView.style.display = 'none';
+      browserView.innerHTML = '';
+      homeView.style.display = 'block';
+      titleEl.textContent = 'Safe sites only';
+      backBtn.disabled = true;
+      setTimeout(() => {
+        const first = grid.querySelector('.browser-site-tile');
+        if (first && ControllerInput.connected) ControllerInput.setFocus(first);
+      }, 0);
+    }
+
+    function showMessage(site, heading, message, allowExternal) {
+      homeView.style.display = 'none';
+      browserView.style.display = 'block';
+      browserView.innerHTML = `
+        <div class="browser-message">
+          <h2>${escapeHTML(heading)}</h2>
+          <p>${escapeHTML(message)}</p>
+          ${allowExternal ? `<button class="browser-external-btn" id="browser-open-external">Open in Microsoft Edge</button>` : ''}
+        </div>`;
+      titleEl.textContent = site ? site.name : 'Blocked';
+      backBtn.disabled = false;
+      const ext = browserView.querySelector('#browser-open-external');
+      if (ext) {
+        ext.addEventListener('click', () => window.open(site.url, '_blank', 'noopener'));
+        if (ControllerInput.connected) ControllerInput.setFocus(ext);
+      }
+    }
+
+    function loadSite(site) {
+      if (!site || !isAllowedSite(site.url)) {
+        showMessage(null, 'Blocked site', 'This site is not on the safe list.', false);
+        return;
+      }
+      currentSite = site;
+      backBtn.disabled = false;
+      titleEl.textContent = site.name;
+
+      if (!site.embed) {
+        showMessage(site, site.name, 'This site is approved, but it opens in Microsoft Edge because it may not work inside the Kid Browser window.', true);
+        return;
+      }
+
+      homeView.style.display = 'none';
+      browserView.style.display = 'block';
+      browserView.innerHTML = `<iframe class="browser-frame" title="${escapeHTML(site.name)}" src="${escapeHTML(site.url)}" sandbox="allow-scripts allow-forms allow-same-origin allow-popups"></iframe>`;
+    }
+
+    allowedSites().forEach(site => {
+      const tile = document.createElement('button');
+      tile.className = 'browser-site-tile';
+      tile.dataset.siteId = site.id;
+      tile.innerHTML = `
+        <span class="browser-site-icon">${site.icon}</span>
+        <span class="browser-site-name">${escapeHTML(site.name)}</span>
+        <span class="browser-site-url">${escapeHTML(new URL(site.url).hostname)}</span>`;
+      tile.addEventListener('click', () => loadSite(site));
+      grid.appendChild(tile);
+    });
+
+    backBtn.addEventListener('click', showHome);
+    homeBtn.addEventListener('click', showHome);
+    showHome();
+  }, Object.assign({ width: 720, height: 520 }, opts));
 }
 
 // ============================================================
@@ -2482,6 +2738,14 @@ function openSettingsApp(opts = {}) {
             <button class="toggle-opt theme-toggle ${state.settings.theme==='dark' ? 'active':''}" data-theme="dark">Dark</button>
           </div>
         </div>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <h3>Kid Browser Whitelist</h3>
+            <p>Approved sites: PBS Kids, Starfall, ABCya, Coolmath Games, YouTube Kids, YouTube</p>
+          </div>
+          <button class="toggle-opt" id="open-browser-settings">Open Browser</button>
+        </div>
         <div class="setting-item">
           <div class="setting-info">
             <h3>Xbox / TV Mode</h3>
@@ -2524,6 +2788,9 @@ function openSettingsApp(opts = {}) {
         applyAppearance();
       });
     });
+
+    const browserSettingsBtn = body.querySelector('#open-browser-settings');
+    if (browserSettingsBtn) browserSettingsBtn.addEventListener('click', () => openApp('browser'));
 
     body.querySelectorAll('.xbox-toggle').forEach(btn => {
       btn.addEventListener('click', () => {
