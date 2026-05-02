@@ -2250,11 +2250,11 @@ function openBrowserApp(opts = {}) {
         <div class="browser-toolbar">
           <button class="browser-back-btn" id="browser-back" disabled>← Back</button>
           <button class="browser-home-btn" id="browser-home">Home</button>
-          <span class="browser-title" id="browser-title">Safe sites only</span>
+          <span class="browser-title" id="browser-title">Safe site launcher</span>
         </div>
         <div class="browser-home" id="browser-home-view">
           <h2>🌐 Kid Browser</h2>
-          <p>Choose an approved site. This browser only allows the sites on the safe list.</p>
+          <p>Choose an approved site. Sites open in Microsoft Edge so blocked embeds do not break.</p>
           <div class="browser-grid" id="browser-grid"></div>
         </div>
         <div class="browser-frame-wrap" id="browser-view" style="display:none"></div>
@@ -2273,7 +2273,7 @@ function openBrowserApp(opts = {}) {
       browserView.style.display = 'none';
       browserView.innerHTML = '';
       homeView.style.display = 'block';
-      titleEl.textContent = 'Safe sites only';
+      titleEl.textContent = 'Safe site launcher';
       backBtn.disabled = true;
       setTimeout(() => {
         const first = grid.querySelector('.browser-site-tile');
@@ -2308,14 +2308,17 @@ function openBrowserApp(opts = {}) {
       backBtn.disabled = false;
       titleEl.textContent = site.name;
 
-      if (!site.embed) {
-        showMessage(site, site.name, 'This site is approved, but it opens in Microsoft Edge because it may not work inside the Kid Browser window.', true);
-        return;
-      }
-
-      homeView.style.display = 'none';
-      browserView.style.display = 'block';
-      browserView.innerHTML = `<iframe class="browser-frame" title="${escapeHTML(site.name)}" src="${escapeHTML(site.url)}" sandbox="allow-scripts allow-forms allow-same-origin allow-popups"></iframe>`;
+      // Most modern sites block iframe embedding with security headers.
+      // Keep Kid Browser locked down as an approved-site launcher, then open the real site in Edge.
+      const opened = window.open(site.url, '_blank', 'noopener');
+      showMessage(
+        site,
+        site.name,
+        opened
+          ? 'Opening this approved site in Microsoft Edge. Use the Kid Browser home button to choose another safe site.'
+          : 'Popup was blocked. This site is approved; press the button below to open it in Microsoft Edge.',
+        true
+      );
     }
 
     allowedSites().forEach(site => {
